@@ -14,4 +14,4 @@ The scripts need a file as first argument which will be source. The file will ne
 # Problems...
 Well there's a little problem... since accept doesn't close the connection (Or i'm doing something wrong), the connection will go into TIME_WAIT.
 This means that we need to wait the time the connection will be closed, after that we can reopen a connection. 
-I will have a look at te source code and probably provide some options, like a bind-address and a close when the FD is closed.
+I will have a look at the source code and probably provide some options, like a bind-address and a close when the FD is closed.
