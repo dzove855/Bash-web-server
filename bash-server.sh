@@ -69,7 +69,7 @@ buildHttpHeaders(){
 buildResponse(){
     # Every output will first be saved in a file and then printed to the output
     # Like this we can build a clean output to the client
-    local tmpFile="${TMPDIR:-/tmp/bash-web-server.$$}"
+    local tmpFile="$(createTemp)"
 
     # build a default header
     httpSendStatus 200
@@ -83,7 +83,8 @@ buildResponse(){
     printf '%s\n' "$(<$tmpFile)"
     
     # remove tmpfile, this should be trapped...
-    rm "$tmpFile"
+    # XXX: No needed anymore, since the clean will do the job for use
+    # rm "$tmpFile"
 }
 
 parseAndPrint(){
@@ -105,6 +106,20 @@ parseAndPrint(){
     buildResponse
 }
 
+createTemp(){
+    # Provide a wrapper of mktemp to store it inside an array and remove all tmpfiles on exit
+    # no need to provide TMPDIR, since mktemp does it auotmatically
+
+    # XXX: The builtin mktemp allows the usage of option -v VARNAME, this would be a much better use case..
+    #       But we don't want to annoy everyone who doesn't provide the builtin
+    local tmpfile="$(mktemp bash-server.XXXXXX)"
+    tmpFiles+=("$tmpfile")
+    printf '%s' "$tmpfile"
+}
+
+clean(){
+    [[ -z "${tmpFiles[*]}" ]] || rm "${tmpFiles[*]}"
+}
 
 main(){
 
@@ -113,6 +128,12 @@ main(){
         printf '%s\n' "Cannot load accept..."
         exit 1
     fi
+
+    
+    # Enable mktemp and rm as a builtin :D
+    # Don't fail if it doesn't exist
+    enable -f "${BASH_LOADABLE_PATH%/}/mktemp"  mktemp  &>/dev/null || true
+    enable -f "${BASH_LOADABLE_PATH%/}/rm"      rm      &>/dev/null || true
 
     enable -f "${BASH_LOADABLE_PATH%/}/accept" accept
 
@@ -129,6 +150,7 @@ main(){
         exit 1
     }
 
+    trap 'clean' EXIT
     while :; do
 
         # We will alway reset all variables and build them again
@@ -137,6 +159,7 @@ main(){
         local -A POST_DATA
         local -A GET_DATA
         local -A HTTP_RESPONSE_HEADERS
+        local -a tmpFiles
 
         # XXX: Accept puts the connection in a TIME_WAIT status.. :(
         accept "${HTTP_PORT:-8080}" || {
@@ -152,8 +175,11 @@ main(){
         exec 4<&-
         exec 4>&-
 
+
+        # Clean tmpfiles
+        clean
         # Unset all vars
-        unset REQUEST_METHOD REQUEST_PATH HTTP_VERSION HTTP_HEADERS POST_DATA GET_DATA HTTP_RESPONSE_HEADERS
+        unset REQUEST_METHOD REQUEST_PATH HTTP_VERSION HTTP_HEADERS POST_DATA GET_DATA HTTP_RESPONSE_HEADERS tmpFiles
 
         sleep "${TIME_WAIT:-61}"
     done
