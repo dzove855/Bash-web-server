@@ -20,4 +20,4 @@ I will have a look at the source code and probably provide some options, like a 
 # TODO
 - [ ] Implement logging and provide a logging format like httpd
 - [ ] Implement multi processing (this will be a huge step, but we need to patch accept)
-- [ ] Implement urlencdoe/decode to provide readable get data
+- [ ] Implement urlencode/decode to provide readable get data
