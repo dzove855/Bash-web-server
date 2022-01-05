@@ -26,7 +26,7 @@ parseGetData(){
 }
 
 parsePostData(){
-    # Split POst data into an assoc if is a form, if not create a key raw
+    # Split POST data into an assoc if is a form, if not create a key raw
     if [[ "${HTTP_HEADERS["Content-type"]}" == "application/x-www-form-urlencoded" ]]; then
         IFS='&' read -rN "${HTTP_HEADERS["Content-Length"]}" -a data
         for entry in "${data[@]}"; do
@@ -153,7 +153,7 @@ main(){
     trap 'clean' EXIT
     while :; do
 
-        # We will alway reset all variables and build them again
+        # We will always reset all variables and build them again
         local REQUEST_METHOD REQUEST_PATH HTTP_VERSION
         local -A HTTP_HEADERS
         local -A POST_DATA
@@ -186,5 +186,4 @@ main(){
     
 }
 
-main "$@" 
-
+main "$@"
