@@ -15,3 +15,9 @@ The scripts need a file as first argument which will be source. The file will ne
 Well there's a little problem... since accept doesn't close the connection (Or i'm doing something wrong), the connection will go into TIME_WAIT.
 This means that we need to wait the time the connection will be closed, after that we can reopen a connection. 
 I will have a look at the source code and probably provide some options, like a bind-address and a close when the FD is closed.
+
+
+# TODO
+- [] Implement logging and provide a logging format like httpd
+- [] Implement multi processing (this will be a huge step, but we need to patch accept)
+- [] Implement urlencdoe/decode to provide readable get data
