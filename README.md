@@ -7,6 +7,7 @@ A purely bash web server, no socat, netcat, etc...
 
 # How to
 The port can be set by the env var: HTTP_PORT
+
 The path to accept (Directory) can be set by using: BASH_LOADABLE_PATH
 
 The scripts need a file as first argument which will be source. The file will need a function named runner, which will be run on each request
