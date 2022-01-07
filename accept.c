@@ -136,8 +136,10 @@ accept_builtin (list)
 
   opt = 1;
   setsockopt (servsock, SOL_SOCKET, SO_REUSEADDR, (void *)&opt, sizeof (opt));
-/*  setsockopt (servsock, SOL_SOCKET, SO_REUSEPORT, (void *)&opt, sizeof(opt));
-  setsockopt (servsock, SOL_SOCKET, SO_LINGER, (void *)&linger, sizeof (linger));*/
+   
+  /* No need of SO_LINGER
+     setsockopt (servsock, SOL_SOCKET, SO_LINGER, (void *)&linger, sizeof (linger));
+  */
 
   if (bind (servsock, (struct sockaddr *)&server, sizeof (server)) < 0)
     {
