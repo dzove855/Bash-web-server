@@ -17,8 +17,11 @@ Well there's a little problem... since accept doesn't close the connection (Or i
 This means that we need to wait the time the connection will be closed, after that we can reopen a connection. 
 I will have a look at the source code and probably provide some options, like a bind-address and a close when the FD is closed.
 
+### UPDATE:
+Accept has been patched by me. Now we can handle multiple request at the same time, without waiting the TIME_WAIT
+
 
 # TODO
 - [ ] Implement logging and provide a logging format like httpd
-- [ ] Implement multi processing (this will be a huge step, but we need to patch accept)
+- [X] Implement multi processing (this will be a huge step, but we need to patch accept)
 - [ ] Implement urlencode/decode to provide readable get data
