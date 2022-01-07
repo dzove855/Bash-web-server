@@ -18,7 +18,9 @@ This means that we need to wait the time the connection will be closed, after th
 I will have a look at the source code and probably provide some options, like a bind-address and a close when the FD is closed.
 
 ### UPDATE:
-Accept has been patched by me. Now we can handle multiple request at the same time, without waiting the TIME_WAIT
+Accept has been patched by me. Now we can handle multiple request at the same time, without waiting the TIME_WAIT. 
+
+To use the new accept, you will need to compile the accept from this repo, a pull request will be send to bash, but it will take some time.
 
 
 # TODO
