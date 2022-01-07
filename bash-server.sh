@@ -164,7 +164,7 @@ main(){
         # XXX: Accept puts the connection in a TIME_WAIT status.. :(
         # Verifiy if bind_address is specified default to 127.0.0.1
         # You should use the custom accept in order to use bind address and multiple connections
-        : "${BIND_ADDRESS:-127.0.0.1}"
+        : "${BIND_ADDRESS:=127.0.0.1}"
         if [[ "${BIND_ADDRESS}" == "0.0.0.0" ]]; then
             accept "${HTTP_PORT:-8080}" || {
                 printf '%s\n' "Could not listen on 0.0.0.0:${HTTP_PORT:-8080}"
