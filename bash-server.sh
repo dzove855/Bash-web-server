@@ -26,7 +26,7 @@ parseGetData(){
 }
 
 parsePostData(){
-    # Split POST data into an assoc if is a form, if not create a key raw
+    # Split POst data into an assoc if is a form, if not create a key raw
     if [[ "${HTTP_HEADERS["Content-type"]}" == "application/x-www-form-urlencoded" ]]; then
         IFS='&' read -rN "${HTTP_HEADERS["Content-Length"]}" -a data
         for entry in "${data[@]}"; do
@@ -153,7 +153,7 @@ main(){
     trap 'clean' EXIT
     while :; do
 
-        # We will always reset all variables and build them again
+        # We will alway reset all variables and build them again
         local REQUEST_METHOD REQUEST_PATH HTTP_VERSION
         local -A HTTP_HEADERS
         local -A POST_DATA
@@ -162,18 +162,28 @@ main(){
         local -a tmpFiles
 
         # XXX: Accept puts the connection in a TIME_WAIT status.. :(
-        accept "${HTTP_PORT:-8080}" || {
-            printf '%s\n' "Could not listen on 0.0.0.0:${HTTP_PORT:-8080}"
-            exit 1
-        }
+        # Verifiy if bind_address is specified default to 127.0.0.1
+        # You should use the custom accept in order to use bind address and multiple connections
+        : "${BIND_ADDRESS:-127.0.0.1}"
+        if [[ "${BIND_ADDRESS}" == "0.0.0.0" ]]; then
+            accept "${HTTP_PORT:-8080}" || {
+                printf '%s\n' "Could not listen on 0.0.0.0:${HTTP_PORT:-8080}"
+                exit 1
+            }
+        else
+            accept -b "${BIND_ADDRESS}" "${HTTP_PORT:-8080}" || {
+                printf '%s\n' "Could not listen on 0.0.0.0:${HTTP_PORT:-8080}"
+                exit 1
+            }
+        fi
 
         parseAndPrint <&${ACCEPT_FD} >&${ACCEPT_FD}
         
         # XXX: This is needed to close the connection to the client
         # XXX: Currently no other way found around it.. :(
 
-        exec 4<&-
-        exec 4>&-
+        exec {ACCEPT_FD}<&-
+        exec {ACCEPT_FD}>&-
 
 
         # Clean tmpfiles
@@ -181,9 +191,10 @@ main(){
         # Unset all vars
         unset REQUEST_METHOD REQUEST_PATH HTTP_VERSION HTTP_HEADERS POST_DATA GET_DATA HTTP_RESPONSE_HEADERS tmpFiles
 
-        sleep "${TIME_WAIT:-61}"
+        sleep "${TIME_WAIT:-0}"
     done
     
 }
 
-main "$@"
+main "$@" 
+
