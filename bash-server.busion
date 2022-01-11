@@ -131,30 +131,7 @@ clean(){
     [[ -z "${tmpFiles[*]}" ]] || rm "${tmpFiles[*]}"
 }
 
-_verbose(){
-    # This function should be a simple debug function, which will print the line given based on debug level
-    # implement in getops the following line:
-    # (( DEBUG_LEVEL++))
-    local LEVEL=1 c printout
-    local funcnamenumber
-    (( funcnamenumber=${#FUNCNAME[@]} - 2 ))
-    : "${DEBUG_LEVEL:=0}"
-    (( DEBUG_LEVEL == 0 )) && return
-    # Add level 1 if first char is not set a number
-    [[ "$1" =~ ^[0-9]$ ]] && { LEVEL=$1; shift; }
-
-    (( LEVEL <= DEBUG_LEVEL )) && {
-        until (( ${#c} == LEVEL )); do c+=":"; done
-        if (( funcnamenumber > 0 )); then
-            printout+="("
-            for ((i=1;i<=funcnamenumber;i++)); do
-                printout+="${FUNCNAME[$i]} <- "
-            done
-            printout="${printout% <- }) - "
-        fi
-        printf '%-7s %s %s\n' "+ $c" "$printout" "$*" 1>&2
-    }
-}
+# Busion source url https://raw.githubusercontent.com/dzove855/bash-useful-functions/main/function/_verbose
 
 main(){
 
@@ -211,7 +188,7 @@ main(){
             # XXX: Currently no other way found around it.. :(
             exec {ACCEPT_FD}>&-
 	    rm $spawnNewProcess
-	) &
+	) 
 
 	until [[ -s "$spawnNewProcess" ]]; do : ; done
 

@@ -22,6 +22,10 @@ Accept has been patched by me. Now we can handle multiple request at the same ti
 
 To use the new accept, you will need to compile the accept from this repo, a pull request will be send to bash, but it will take some time.
 
+Now we can run multiple connection on the same time, since the connection is running in a subshell.
+
+# Busion
+Busion is used to source some functions from other repositorys instead of copy/paste (https://github.com/dzove855/busion)
 
 # TODO
 - [ ] Implement logging and provide a logging format like httpd
