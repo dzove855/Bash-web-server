@@ -181,14 +181,14 @@ main(){
                 printf '%s\n' "Could not listen on ${BIND_ADDRESS}:${HTTP_PORT}"
                 exit 1
             }
-	    
+
             printf '1' > "$spawnNewProcess"
             parseAndPrint <&${ACCEPT_FD} >&${ACCEPT_FD}
 
             # XXX: This is needed to close the connection to the client
             # XXX: Currently no other way found around it.. :(
             exec {ACCEPT_FD}>&-
-	        rm $spawnNewProcess
+            rm $spawnNewProcess
 	    ) & 
 
 	    until [[ -s "$spawnNewProcess" || ! -f "$spawnNewProcess" ]]; do : ; done
