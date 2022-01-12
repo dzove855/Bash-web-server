@@ -194,9 +194,9 @@ main(){
     trap 'clean' EXIT
     while :; do
 	
-	    _verbose 1 "Listening on $BIND_ADDRESS port $HTTP_PORT"
-	    spawnNewProcess="$(mktemp)"
-	    (
+        _verbose 1 "Listening on $BIND_ADDRESS port $HTTP_PORT"
+        spawnNewProcess="$(mktemp)"
+        (
             # XXX: Accept puts the connection in a TIME_WAIT status.. :(
             # Verifiy if bind_address is specified default to 127.0.0.1
             # You should use the custom accept in order to use bind address and multiple connections
@@ -212,9 +212,9 @@ main(){
             # XXX: Currently no other way found around it.. :(
             exec {ACCEPT_FD}>&-
             rm $spawnNewProcess
-	    ) & 
+        ) & 
 
-	    until [[ -s "$spawnNewProcess" || ! -f "$spawnNewProcess" ]]; do : ; done
+        until [[ -s "$spawnNewProcess" || ! -f "$spawnNewProcess" ]]; do : ; done
 
         # Since the patch, no need of sleep anymore
         #sleep "${TIME_WAIT:-0}"
