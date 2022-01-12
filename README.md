@@ -31,3 +31,4 @@ Busion is used to source some functions from other repositorys instead of copy/p
 - [ ] Implement logging and provide a logging format like httpd
 - [X] Implement multi processing (this will be a huge step, but we need to patch accept)
 - [ ] Implement urlencode/decode to provide readable get data
+- [ ] Implement content-type detection

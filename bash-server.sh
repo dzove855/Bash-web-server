@@ -18,10 +18,11 @@ parseHttpHeaders(){
 
 parseGetData(){
     # Split QUERY_STRING into an assoc, so it can be easy reused
-    IFS='?' read -r _ get <<<"$REQUEST_PATH"
+    IFS='?' read -r REQUEST_PATH get <<<"$REQUEST_PATH"
+    QUERY_STRING="$get"
     IFS='&' read -ra data <<<"$get"
     for entry in "${data[@]}"; do
-        GET_DATA["${entry%%=*}"]="${entry#*:}"
+        GET["${entry%%=*}"]="${entry#*:}"
     done
 }
 
@@ -31,11 +32,11 @@ parsePostData(){
         IFS='&' read -rN "${HTTP_HEADERS["Content-Length"]}" -a data
         for entry in "${data[@]}"; do
             entry="${entry%%$'\r'}"
-            POST_DATA["${entry%%=*}"]="${entry#*:}"
+            POST["${entry%%=*}"]="${entry#*:}"
         done
     else
         read -rN "${HTTP_HEADERS["Content-Length"]}" data
-        POST_DATA["raw"]="${data%%$'\r'}"
+        POST["raw"]="${data%%$'\r'}"
     fi
 }
 
@@ -89,10 +90,10 @@ buildResponse(){
 
 parseAndPrint(){
     # We will alway reset all variables and build them again
-    local REQUEST_METHOD REQUEST_PATH HTTP_VERSION
+    local REQUEST_METHOD REQUEST_PATH HTTP_VERSION QUERY_STRING
     local -A HTTP_HEADERS
-    local -A POST_DATA
-    local -A GET_DATA
+    local -A POST
+    local -A GET
     local -A HTTP_RESPONSE_HEADERS
     local -a tmpFiles
 
@@ -193,9 +194,9 @@ main(){
     trap 'clean' EXIT
     while :; do
 	
-	_verbose 1 "Listening on $BIND_ADDRESS port $HTTP_PORT"
-	spawnNewProcess="$(mktemp)"
-	(
+	    _verbose 1 "Listening on $BIND_ADDRESS port $HTTP_PORT"
+	    spawnNewProcess="$(mktemp)"
+	    (
             # XXX: Accept puts the connection in a TIME_WAIT status.. :(
             # Verifiy if bind_address is specified default to 127.0.0.1
             # You should use the custom accept in order to use bind address and multiple connections
@@ -210,12 +211,13 @@ main(){
             # XXX: This is needed to close the connection to the client
             # XXX: Currently no other way found around it.. :(
             exec {ACCEPT_FD}>&-
-	    rm $spawnNewProcess
-	) &
+	        rm $spawnNewProcess
+	    ) & 
 
-	until [[ -s "$spawnNewProcess" ]]; do : ; done
+	    until [[ -s "$spawnNewProcess" || ! -f "$spawnNewProcess" ]]; do : ; done
 
-        sleep "${TIME_WAIT:-0}"
+        # Since the patch, no need of sleep anymore
+        #sleep "${TIME_WAIT:-0}"
     done
     
 }
