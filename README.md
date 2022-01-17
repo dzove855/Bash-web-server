@@ -10,7 +10,9 @@ The port can be set by the env var: HTTP_PORT
 
 The path to accept (Directory) can be set by using: BASH_LOADABLE_PATH
 
-The scripts need a file as first argument which will be source. The file will need a function named runner, which will be run on each request
+Server Methods:
+* serverHtml (needs DOCUMENT_ROOT envvars) - This will serve the static files
+* script file - The script need a file as first argument which will be source. The file will need a function named runner, which will be run on each request
 
 # Problems...
 Well there's a little problem... since accept doesn't close the connection (Or i'm doing something wrong), the connection will go into TIME_WAIT.
@@ -31,4 +33,4 @@ Busion is used to source some functions from other repositorys instead of copy/p
 - [ ] Implement logging and provide a logging format like httpd
 - [X] Implement multi processing (this will be a huge step, but we need to patch accept)
 - [ ] Implement urlencode/decode to provide readable get data
-- [ ] Implement content-type detection
+- [ ] Implement content-type detection - Use mime type like nginx

@@ -19,6 +19,9 @@ parseHttpHeaders(){
 parseGetData(){
     # Split QUERY_STRING into an assoc, so it can be easy reused
     IFS='?' read -r REQUEST_PATH get <<<"$REQUEST_PATH"
+
+    # Split html #
+    IFS='#' read -r REQUEST_PATH _ <<<"$REQUEST_PATH"
     QUERY_STRING="$get"
     IFS='&' read -ra data <<<"$get"
     for entry in "${data[@]}"; do
@@ -75,7 +78,7 @@ buildResponse(){
     # build a default header
     httpSendStatus 200
 
-    runner >"$tmpFile"
+    "$run" >"$tmpFile"
     
     buildHttpHeaders
     # From HTTP RFC 2616 send newline before body
@@ -132,6 +135,31 @@ clean(){
     [[ -z "${tmpFiles[*]}" ]] || rm "${tmpFiles[*]}"
 }
 
+serveHtml(){
+    if [[ ! -z "$DOCUMENT_ROOT" ]]; then
+        DOCUMENT_ROOT="${DOCUMENT_ROOT%/}"
+
+        # Don't allow going out of DOCUMENT_ROOT
+        case "$DOCUMENT_ROOT" in
+            *".."*|*"~"*)
+                httpSendStatus 404
+                printf '404 Page Not Found!\n'
+                return
+            ;;
+        esac
+        [[ "$REQUEST_PATH" == "/" ]] && REQUEST_PATH="/index.html"
+        if [[ -f "$DOCUMENT_ROOT/${REQUEST_PATH#/}" ]]; then
+            printf '%s\n' "$(<$DOCUMENT_ROOT/${REQUEST_PATH#/})"
+        else
+            httpSendStatus 404
+            printf '404 Page Not Found!\n'
+        fi
+    else
+        httpSendStatus 404
+        printf '404 Page Not Found!\n'
+    fi
+}
+
 _verbose(){
     # This function should be a simple debug function, which will print the line given based on debug level
     # implement in getops the following line:
@@ -177,19 +205,26 @@ main(){
     enable -f "${BASH_LOADABLE_PATH%/}/rm"      rm      &>/dev/null || true
 
     enable -f "${BASH_LOADABLE_PATH%/}/accept" accept
-
-    # source the configuration file and check if runner is defined
-    [[ -z "$1" || ! -f "$1" ]] && {
-        printf '%s\n' "please provide a file to source as the first argument..."
-        exit 1
-    }
-
-    # source main file
-    source "$1"
-    type runner &>/dev/null || {
-        printf '%s\n' "The source file need a function nammed runner which will be executed on each request..."
-        exit 1
-    }
+ 
+    case "$1" in
+        serveHtml)
+            run="serveHtml"
+        ;;
+        *)
+            # source the configuration file and check if runner is defined
+            [[ -z "$1" || ! -f "$1" ]] && {
+                printf '%s\n' "please provide a file to source as the first argument..."
+                exit 1
+            }
+            # source main file
+            source "$1"
+            type runner &>/dev/null || {
+                printf '%s\n' "The source file need a function nammed runner which will be executed on each request..."
+                exit 1
+            }
+            run="runner"
+        ;;
+    esac
 
     trap 'clean' EXIT
     while :; do
