@@ -80,12 +80,12 @@ buildResponse(){
 
     # get mime type
     IFS=. read -r _ extension <<<"$REQUEST_PATH"
-    [[ -z "${MIME_TYPES["$extension"]}" ]] || HTTP_RESPONSE_HEADERS["Content-type"]="${MIME_TYPES["$extension"]}"
+    [[ -z "${MIME_TYPES["$extension"]}" ]] || HTTP_RESPONSE_HEADERS["Content-Type"]="${MIME_TYPES["$extension"]}"
 
     "$run" >"$tmpFile"
 
     # get content-legth 
-    PATH="" type -p "finfo" &>/dev/null && HTTP_RESPONSE_HEADERS["Content-length"]="$(finfo -s $tmpFile)"
+    PATH="" type -p "finfo" &>/dev/null && HTTP_RESPONSE_HEADERS["Content-Length"]="$(finfo -s $tmpFile)"
 
     buildHttpHeaders
     # From HTTP RFC 2616 send newline before body
