@@ -223,7 +223,10 @@ main(){
     enable -f "${BASH_LOADABLE_PATH%/}/rm"      rm      &>/dev/null || true
     enable -f "${BASH_LOADABLE_PATH%/}/finfo"   finfo   &>/dev/null || true
 
-    enable -f "${BASH_LOADABLE_PATH%/}/accept" accept
+    enable -f "${BASH_LOADABLE_PATH%/}/accept" accept || {
+        printf '%s\n' "Could not load accept..."
+        exit 1
+    }
  
     case "$1" in
         serveHtml)
