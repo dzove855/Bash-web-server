@@ -11,7 +11,7 @@ The port can be set by the env var: HTTP_PORT
 The path to accept (Directory) can be set by using: BASH_LOADABLE_PATH
 
 Server Methods:
-* serverHtml (needs DOCUMENT_ROOT envvars) - This will serve the static files
+* serveHtml (needs DOCUMENT_ROOT envvars) - This will serve the static files
 * script file - The script need a file as first argument which will be source. The file will need a function named runner, which will be run on each request
 
 # Problems...
