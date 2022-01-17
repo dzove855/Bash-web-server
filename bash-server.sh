@@ -163,7 +163,7 @@ main(){
     : "${HTTP_PORT:=8080}"
     : "${BIND_ADDRESS:=127.0.0.1}"
     
-    ! [[ ${BIND_ADDRESS} == "0.0.0.0" ]] && accpetArg="-b ${BIND_ADDRESS}"
+    ! [[ ${BIND_ADDRESS} == "0.0.0.0" ]] && acceptArg="-b ${BIND_ADDRESS}"
 
     if ! [[ -f "${BASH_LOADABLE_PATH%/}/accept" ]]; then
         printf '%s\n' "Cannot load accept..."
