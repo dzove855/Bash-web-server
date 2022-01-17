@@ -78,8 +78,15 @@ buildResponse(){
     # build a default header
     httpSendStatus 200
 
+    # get mime type
+    IFS=. read -r _ extension <<<"$REQUEST_PATH"
+    [[ -z "${MIME_TYPES["$extension"]}" ]] || HTTP_RESPONSE_HEADERS["Content-type"]="${MIME_TYPES["$extension"]}"
+
     "$run" >"$tmpFile"
-    
+
+    # get content-legth 
+    PATH="" type -p "finfo" &>/dev/null && HTTP_RESPONSE_HEADERS["Content-length"]="$(finfo -s $tmpFile)"
+
     buildHttpHeaders
     # From HTTP RFC 2616 send newline before body
     printf "\n"
@@ -187,9 +194,12 @@ _verbose(){
 
 main(){
 
+    local -A MIME_TYPES
+
     : "${BASH_LOADABLE_PATH:=/usr/lib/bash}"
     : "${HTTP_PORT:=8080}"
     : "${BIND_ADDRESS:=127.0.0.1}"
+    : "${MIME_TYPES_FILE:=./mime.types}"
     
     ! [[ ${BIND_ADDRESS} == "0.0.0.0" ]] && acceptArg="-b ${BIND_ADDRESS}"
 
@@ -198,11 +208,20 @@ main(){
         exit 1
     fi
 
+    [[ -f "$MIME_TYPES_FILE" ]] && \
+        while read -r types extension; do
+            read -a extensions <<<"$extension"
+            for ext in "${extensions[@]}"; do
+                MIME_TYPES["$ext"]="$types"
+            done
+        done <"$MIME_TYPES_FILE"
+
     
     # Enable mktemp and rm as a builtin :D
     # Don't fail if it doesn't exist
     enable -f "${BASH_LOADABLE_PATH%/}/mktemp"  mktemp  &>/dev/null || true
     enable -f "${BASH_LOADABLE_PATH%/}/rm"      rm      &>/dev/null || true
+    enable -f "${BASH_LOADABLE_PATH%/}/finfo"   finfo   &>/dev/null || true
 
     enable -f "${BASH_LOADABLE_PATH%/}/accept" accept
  
