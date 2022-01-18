@@ -73,25 +73,24 @@ buildHttpHeaders(){
 buildResponse(){
     # Every output will first be saved in a file and then printed to the output
     # Like this we can build a clean output to the client
-    local tmpFile="$(createTemp)"
 
     # build a default header
     httpSendStatus 200
 
     # get mime type
     IFS=. read -r _ extension <<<"$REQUEST_PATH"
-    [[ -z "${MIME_TYPES["$extension"]}" ]] || HTTP_RESPONSE_HEADERS["Content-Type"]="${MIME_TYPES["$extension"]}"
+    [[ -z "${MIME_TYPES["${extension:-html}"]}" ]] || HTTP_RESPONSE_HEADERS["Content-Type"]="${MIME_TYPES["${extension:-html}"]}"
 
-    "$run" >"$tmpFile"
+    "$run" >"$TMPDIR/output"
 
     # get content-legth 
-    PATH="" type -p "finfo" &>/dev/null && HTTP_RESPONSE_HEADERS["Content-Length"]="$(finfo -s $tmpFile)"
+    PATH="" type -p "finfo" &>/dev/null && HTTP_RESPONSE_HEADERS["Content-Length"]="$(finfo -s $TMPDIR/output)"
 
     buildHttpHeaders
     # From HTTP RFC 2616 send newline before body
     printf "\n"
 
-    printf '%s\n' "$(<$tmpFile)"
+    printf '%s\n' "$(<$TMPDIR/output)"
     
     # remove tmpfile, this should be trapped...
     # XXX: No needed anymore, since the clean will do the job for use
@@ -105,7 +104,9 @@ parseAndPrint(){
     local -A POST
     local -A GET
     local -A HTTP_RESPONSE_HEADERS
-    local -a tmpFiles
+
+    # Now mktemp will write create files inside the temporary directory
+    local -r TMPDIR="$serverTmpDir"
 
     # Parse Request
     parseHttpRequest
@@ -117,29 +118,12 @@ parseAndPrint(){
     parseGetData
 
     # Parse post data only if length is > 0 and post is specified
+    # bash (( will not fail if var is not a number, it will just return 1, no need of int check
     if [[ "$REQUEST_METHOD" == "POST" ]] && (( ${HTTP_HEADERS['Content-Length']} > 0 )); then
         parsePostData
     fi
 
     buildResponse
-
-    # Clean tmpfiles
-    clean
-}
-
-createTemp(){
-    # Provide a wrapper of mktemp to store it inside an array and remove all tmpfiles on exit
-    # no need to provide TMPDIR, since mktemp does it auotmatically
-
-    # XXX: The builtin mktemp allows the usage of option -v VARNAME, this would be a much better use case..
-    #       But we don't want to annoy everyone who doesn't provide the builtin
-    local tmpfile="$(mktemp ${TMPDIR:-/tmp}/bash-server.XXXXXX)"
-    tmpFiles+=("$tmpfile")
-    printf '%s' "$tmpfile"
-}
-
-clean(){
-    [[ -z "${tmpFiles[*]}" ]] || rm "${tmpFiles[*]}"
 }
 
 serveHtml(){
@@ -200,7 +184,9 @@ main(){
     : "${HTTP_PORT:=8080}"
     : "${BIND_ADDRESS:=127.0.0.1}"
     : "${MIME_TYPES_FILE:=./mime.types}"
-    
+    : "${TMPDIR:=/tmp}"
+    TMPDIR="${TMPDIR%/}"
+
     ! [[ ${BIND_ADDRESS} == "0.0.0.0" ]] && acceptArg="-b ${BIND_ADDRESS}"
 
     if ! [[ -f "${BASH_LOADABLE_PATH%/}/accept" ]]; then
@@ -248,11 +234,15 @@ main(){
         ;;
     esac
 
-    trap 'clean' EXIT
     while :; do
 	
+        # create temporary directory for each request
         _verbose 1 "Listening on $BIND_ADDRESS port $HTTP_PORT"
-        spawnNewProcess="$(mktemp)"
+
+        serverTmpDir="$(mktemp -d)"
+        # Create the file, but do not zrite inside
+        : > "$serverTmpDir/spawnNewProcess"
+
         (
             # XXX: Accept puts the connection in a TIME_WAIT status.. :(
             # Verifiy if bind_address is specified default to 127.0.0.1
@@ -262,16 +252,18 @@ main(){
                 exit 1
             }
 
-            printf '1' > "$spawnNewProcess"
+            printf '1' > "$serverTmpDir/spawnNewProcess"
             parseAndPrint <&${ACCEPT_FD} >&${ACCEPT_FD}
 
             # XXX: This is needed to close the connection to the client
             # XXX: Currently no other way found around it.. :(
             exec {ACCEPT_FD}>&-
-            rm $spawnNewProcess
+
+            # remove the temporary directoru
+            rm -rf "$serverTmpDir"
         ) & 
 
-        until [[ -s "$spawnNewProcess" || ! -f "$spawnNewProcess" ]]; do : ; done
+        until [[ -s "$serverTmpDir/spawnNewProcess" || ! -f "$serverTmpDir/spawnNewProcess" ]]; do : ; done
 
         # Since the patch, no need of sleep anymore
         #sleep "${TIME_WAIT:-0}"
