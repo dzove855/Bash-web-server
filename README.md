@@ -30,7 +30,7 @@ Now we can run multiple connection on the same time, since the connection is run
 Busion is used to source some functions from other repositorys instead of copy/paste (https://github.com/dzove855/busion)
 
 # TODO
-- [ ] Implement logging and provide a logging format like httpd
+- [X] Implement logging and provide a logging format like httpd
 - [X] Implement multi processing (this will be a huge step, but we need to patch accept)
 - [ ] Implement urlencode/decode to provide readable get data
 - [X] Implement content-type detection - Use mime type like nginx
