@@ -2,7 +2,7 @@
 A purely bash web server, no socat, netcat, etc... 
 
 # Requirement
-* bash 5.1
+* bash 5.2 (The patch will be included in bash5.2 - Alpha release already contains the patch)
 * loadable accept builtin (http://git.savannah.gnu.org/cgit/bash.git/tree/examples/loadables/accept.c)
 
 # How to
