@@ -86,6 +86,9 @@ buildResponse(){
     # get content-legth 
     PATH="" type -p "finfo" &>/dev/null && HTTP_RESPONSE_HEADERS["Content-Length"]="$(finfo -s $TMPDIR/output)"
 
+    # print output to logfile
+    (( LOGGING )) && logPrint
+
     buildHttpHeaders
     # From HTTP RFC 2616 send newline before body
     printf "\n"
@@ -151,6 +154,28 @@ serveHtml(){
     fi
 }
 
+logPrint(){
+    local -A logformat
+    local output="${LOGFORMAT}"    
+
+    logformat["%a"]="$RHOST"
+    logformat["%A"]="${BIND_ADDRESS}"
+    logformat["%b"]="${HTTP_RESPONSE_HEADERS["Content-Length"]}"
+    logformat["%m"]="$REQUEST_METHOD"
+    logformat["%q"]="$QUERY_STRING"
+    logformat["%t"]="$TIME_FORMATTED"
+    logformat["%s"]="${HTTP_RESPONSE_HEADERS['status']%% *}"
+    logformat["%T"]="$(( $(printf '%(%s)T' -1 ) - $TIME_SECONDS))"
+    logformat["%U"]="$REQUEST_PATH"
+    
+
+    for key in "${!logformat[@]}"; do
+        output="${output//"$key"/"${logformat[$key]}"}"
+    done
+
+    printf '%s\n' "$output" >> "$LOGFILE"
+}
+
 # Busion source url https://raw.githubusercontent.com/dzove855/bash-useful-functions/main/function/_verbose
 
 main(){
@@ -162,6 +187,9 @@ main(){
     : "${BIND_ADDRESS:=127.0.0.1}"
     : "${MIME_TYPES_FILE:=./mime.types}"
     : "${TMPDIR:=/tmp}"
+    : "${LOGFORMAT:="[%t] - %a %m %U %s %b %T"}"
+    : "${LOGFILE:=access.log}"
+    : "${LOGGING:=1}"
     TMPDIR="${TMPDIR%/}"
 
     ! [[ ${BIND_ADDRESS} == "0.0.0.0" ]] && acceptArg="-b ${BIND_ADDRESS}"
@@ -230,6 +258,8 @@ main(){
             }
 
             printf '1' > "$serverTmpDir/spawnNewProcess"
+            printf -v TIME_FORMATTED '%(%d/%b/%Y:%H:%M:%S)T' -1
+            printf -v TIME_SECONDS '%(%s)T' -1
             parseAndPrint <&${ACCEPT_FD} >&${ACCEPT_FD}
 
             # XXX: This is needed to close the connection to the client
@@ -249,4 +279,3 @@ main(){
 }
 
 main "$@" 
-
