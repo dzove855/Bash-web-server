@@ -13,6 +13,7 @@ parseHttpRequest(){
 }
 
 parseHttpHeaders(){
+    local line
     # Split headers and put it inside HTTP_HEADERS, so it can be reused
     while read -r line; do
         line="${line%%$'\r'}"
@@ -23,6 +24,7 @@ parseHttpHeaders(){
 }
 
 parseGetData(){
+    local entry
     # Split QUERY_STRING into an assoc, so it can be easy reused
     IFS='?' read -r REQUEST_PATH get <<<"$REQUEST_PATH"
 
@@ -39,6 +41,7 @@ parseGetData(){
 }
 
 parsePostData(){
+    local entry
     # Split POst data into an assoc if is a form, if not create a key raw
     if [[ "${HTTP_HEADERS["Content-type"]}" == "application/x-www-form-urlencoded" ]]; then
         IFS='&' read -rN "${HTTP_HEADERS["Content-Length"]}" -a data
