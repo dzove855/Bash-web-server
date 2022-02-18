@@ -1,5 +1,11 @@
 #!/usr/local/bin/bash
 
+# https://github.com/dylanaraps/pure-bash-bible#decode-a-percent-encoded-string
+urldecode() {
+    : "${1//+/ }"
+    printf '%b\n' "${_//%/\\x}"
+}
+
 parseHttpRequest(){
     # Get information about the request
     read -r REQUEST_METHOD REQUEST_PATH HTTP_VERSION
@@ -19,6 +25,9 @@ parseHttpHeaders(){
 parseGetData(){
     # Split QUERY_STRING into an assoc, so it can be easy reused
     IFS='?' read -r REQUEST_PATH get <<<"$REQUEST_PATH"
+
+    # Url decode get data
+    get="$(urldecode "$get")"
 
     # Split html #
     IFS='#' read -r REQUEST_PATH _ <<<"$REQUEST_PATH"
@@ -41,6 +50,17 @@ parsePostData(){
         read -rN "${HTTP_HEADERS["Content-Length"]}" data
         POST["raw"]="${data%%$'\r'}"
     fi
+}
+
+parseCookieData(){
+    local -a cookie
+    local entry key value
+    IFS=';' read -ra cookie <<<"${HTTP_HEADERS["Cookie"]}"
+
+    for entry in "${cookie[@]}"; do
+        IFS='=' read -r key value <<<"$entry"
+        COOKIE["${key# }"]="${value% }"
+    done
 }
 
 httpSendStatus(){
@@ -107,6 +127,7 @@ parseAndPrint(){
     local -A POST
     local -A GET
     local -A HTTP_RESPONSE_HEADERS
+    local -A COOKIE
 
     # Now mktemp will write create files inside the temporary directory
     local -r TMPDIR="$serverTmpDir"
@@ -119,6 +140,9 @@ parseAndPrint(){
 
     # Parse Get Data
     parseGetData
+
+    # Parse cookie data
+    parseCookieData
 
     # Parse post data only if length is > 0 and post is specified
     # bash (( will not fail if var is not a number, it will just return 1, no need of int check
