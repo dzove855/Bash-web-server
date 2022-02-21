@@ -3,7 +3,7 @@ A purely bash web server, no socat, netcat, etc...
 
 # Requirement
 * bash 5.2 (The patch will be included in bash5.2 - Alpha release already contains the patch)
-* loadable accept builtin (http://git.savannah.gnu.org/cgit/bash.git/tree/examples/loadables/accept.c)
+* if bash version is under 5.2, patched loadable accept builtin (http://git.savannah.gnu.org/cgit/bash.git/tree/examples/loadables/accept.c) is needed, you have to apply accept.patch to your loadable accept.c file which is existed in bash source code, and than build and install the loadable accept builtin into BASH_LOADABLE_PATH specified in `bash-server.sh`
 
 # How to
 The port can be set by the env var: HTTP_PORT
