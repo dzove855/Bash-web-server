@@ -98,7 +98,14 @@ buildResponse(){
     # Like this we can build a clean output to the client
 
     # build a default header
-    httpSendStatus 200
+    httpSendStatus $1
+
+    [[ $1 == 401 ]] && \
+    {
+        HTTP_RESPONSE_HEADERS['WWW-Authenticate']="Basic realm=FileServer"
+        buildHttpHeaders
+        return
+    }
 
     # get mime type
     IFS=. read -r _ extension <<<"$REQUEST_PATH"
@@ -141,6 +148,11 @@ parseAndPrint(){
     # Create headers assoc
     parseHttpHeaders
 
+    # Basic Auth
+    if [[ -n "$NEED_AUTH" ]] && basicAuth -eq 0; then
+        return
+    fi
+
     # Parse Get Data
     parseGetData
 
@@ -153,7 +165,34 @@ parseAndPrint(){
         parsePostData
     fi
 
-    buildResponse
+    buildResponse 200
+}
+
+basicAuth(){
+    local authData
+    local user password
+    let pass=0
+
+    if [[ -z "${HTTP_HEADERS["Authorization"]}" ]]; then
+        buildResponse 401
+        return 0
+    fi
+
+    # Decode auth data
+    authData="$(base64 -d <<<"${HTTP_HEADERS["Authorization"]# Basic }")"
+
+    # Split auth data into user and password
+    IFS=: read -r user password <<<"$authData"
+
+    # Check if user and password appear in users.csv
+    pass=$(awk -v user="$user" -v password="$password" 'BEGIN {existed=0} \
+        {if($1 == user && $2 == password) {existed = 1}} \
+        END {print existed}' < users.csv)
+
+    [[ $pass -eq 1 ]] && return 1
+
+    buildResponse 401
+    return 0
 }
 
 serveHtml(){
