@@ -170,8 +170,7 @@ parseAndPrint(){
 
 basicAuth(){
     local authData
-    local user password
-    let pass=0
+    local user password 
 
     if [[ -z "${HTTP_HEADERS["Authorization"]}" ]]; then
         buildResponse 401
@@ -179,20 +178,21 @@ basicAuth(){
     fi
 
     # Decode auth data
+    # TODO: implement base64 in bash
     authData="$(base64 -d <<<"${HTTP_HEADERS["Authorization"]# Basic }")"
 
     # Split auth data into user and password
     IFS=: read -r user password <<<"$authData"
 
     # Check if user and password appear in users.csv
-    pass=$(awk -v user="$user" -v password="$password" 'BEGIN {existed=0} \
-        {if($1 == user && $2 == password) {existed = 1}} \
-        END {print existed}' < users.csv)
-
-    [[ $pass -eq 1 ]] && return 1
+    while read -r r_user r_password; do
+        [[ "$r_user" == "$user" && "$r_password" == "$password" ]] && {
+            return
+        }
+    done
 
     buildResponse 401
-    return 0
+    return 1
 }
 
 serveHtml(){
