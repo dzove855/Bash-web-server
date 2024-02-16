@@ -38,4 +38,5 @@ Busion is used to source some functions from other repositorys instead of copy/p
 - [X] Implement content-type detection - Use mime type like nginx
 - [X] Add basic auth
 - [X] Add cookie handler
-- [ ] Add session handler
+- [X] Add session handler
+- [ ] Implement Cookie send

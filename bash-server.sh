@@ -138,6 +138,7 @@ parseAndPrint(){
     local -A GET
     local -A HTTP_RESPONSE_HEADERS
     local -A COOKIE
+    local -A SESSION
 
     # Now mktemp will write create files inside the temporary directory
     local -r TMPDIR="$serverTmpDir"
@@ -149,8 +150,8 @@ parseAndPrint(){
     parseHttpHeaders
 
     # Basic Auth
-    if [[ -n "$NEED_AUTH" ]] && basicAuth -eq 0; then
-        return
+    if (( $BASIC_AUTH )) then
+        basicAuth || return 1
     fi
 
     # Parse Get Data
@@ -171,6 +172,8 @@ parseAndPrint(){
 basicAuth(){
     local authData
     local user password 
+
+    [[ -f "$BASIC_AUTH_FILE" ]] || return 1
 
     if [[ -z "${HTTP_HEADERS["Authorization"]}" ]]; then
         buildResponse 401
@@ -193,6 +196,23 @@ basicAuth(){
 
     buildResponse 401
     return 1
+}
+
+sessionStart(){
+    if [[ ! -z "${COOKIE[$SESSION_COOKIE]}" && -f "${SESSION_PATH}/${COOKIE[$SESSION_COOKIE]}" ]]; then
+        return 0
+    fi
+}
+
+sessionGet(){
+    sessionStart && source "${SESSION_PATH}/${COOKIE[$SESSION_COOKIE]}"
+    printf '%s' "${SESSION[$1]}"
+}
+
+sessionSet(){
+    sessionStart && source "${SESSION_PATH}/${COOKIE[$SESSION_COOKIE]}"
+    SESSION["$1"]="$2"
+    declare -p SESSION > "${SESSION_PATH}/${COOKIE[$SESSION_COOKIE]}"
 }
 
 serveHtml(){
@@ -279,6 +299,8 @@ main(){
     : "${LOGFORMAT:="[%t] - %a %m %U %s %b %T"}"
     : "${LOGFILE:=access.log}"
     : "${LOGGING:=1}"
+    : "${SESSION_COOKIE:=BASHSESSID}"
+    : "${BASIC_AUTH:=0}"
     TMPDIR="${TMPDIR%/}"
 
     ! [[ ${BIND_ADDRESS} == "0.0.0.0" ]] && acceptArg="-b ${BIND_ADDRESS}"
