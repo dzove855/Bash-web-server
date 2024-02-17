@@ -88,7 +88,14 @@ buildHttpHeaders(){
     printf '%s %s\n' "$HTTP_VERSION" "${HTTP_RESPONSE_HEADERS['status']}"
     unset HTTP_RESPONSE_HEADERS['status']
 
+    _verbose 2 "${cookie_to_send}"
+
+    for value in "${cookie_to_send[@]}"; do
+        printf 'Set-Cookie: %s\n' "$value"
+    done
+
     for key in "${!HTTP_RESPONSE_HEADERS[@]}"; do
+        _verbose 2 "$key ${HTTP_RESPONSE_HEADERS[$key]}"
         printf '%s: %s\n' "$key" "${HTTP_RESPONSE_HEADERS[$key]}"
     done 
 }
@@ -102,7 +109,7 @@ buildResponse(){
 
     [[ $1 == 401 ]] && \
     {
-        HTTP_RESPONSE_HEADERS['WWW-Authenticate']="Basic realm=FileServer"
+        HTTP_RESPONSE_HEADERS['WWW-Authenticate']="Basic realm=WebServer"
         buildHttpHeaders
         return
     }
@@ -139,6 +146,7 @@ parseAndPrint(){
     local -A HTTP_RESPONSE_HEADERS
     local -A COOKIE
     local -A SESSION
+    local -a cookie_to_send
 
     # Now mktemp will write create files inside the temporary directory
     local -r TMPDIR="$serverTmpDir"
@@ -173,7 +181,10 @@ basicAuth(){
     local authData
     local user password 
 
-    [[ -f "$BASIC_AUTH_FILE" ]] || return 1
+    [[ -f "$BASIC_AUTH_FILE" ]] || {
+        _verbose 1 "Missing \$BASIC_AUTH_FILE"
+        return 1
+    }
 
     if [[ -z "${HTTP_HEADERS["Authorization"]}" ]]; then
         buildResponse 401
@@ -192,7 +203,7 @@ basicAuth(){
         [[ "$r_user" == "$user" && "$r_password" == "$password" ]] && {
             return
         }
-    done
+    done < "$BASIC_AUTH_FILE"
 
     buildResponse 401
     return 1
@@ -213,6 +224,11 @@ sessionSet(){
     sessionStart && source "${SESSION_PATH}/${COOKIE[$SESSION_COOKIE]}"
     SESSION["$1"]="$2"
     declare -p SESSION > "${SESSION_PATH}/${COOKIE[$SESSION_COOKIE]}"
+}
+
+cookieSet(){
+    _verbose 2 "$1"
+    cookie_to_send+=("$1")
 }
 
 serveHtml(){
@@ -287,6 +303,10 @@ _verbose(){
     }
 }
 
+clean(){
+    kill -9 $_pid
+}
+
 main(){
 
     local -A MIME_TYPES
@@ -324,6 +344,8 @@ main(){
     enable -f "rm"      rm      &>/dev/null || true
     enable -f "finfo"   finfo   &>/dev/null || true
  
+    trap clean EXIT
+
     case "$1" in
         serveHtml)
             run="serveHtml"
@@ -374,6 +396,8 @@ main(){
             # remove the temporary directoru
             rm -rf "$serverTmpDir"
         ) & 
+
+        _pid="$!"
 
         until [[ -s "$serverTmpDir/spawnNewProcess" || ! -f "$serverTmpDir/spawnNewProcess" ]]; do : ; done
 
