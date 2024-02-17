@@ -8,35 +8,56 @@ A purely bash web server, no socat, netcat, etc...
 # How to
 The port can be set by the env var: HTTP_PORT
 
-The path to accept (Directory) can be set by using: BASH_LOADABLE_PATH
+The path to accept (Directory) can be set by using: BASH_LOADABLES_PATH (see man bash)
 
 Server Methods:
 * serveHtml (needs DOCUMENT_ROOT envvars) - This will serve the static files
 * script file - The script need a file as first argument which will be source. The file will need a function named runner, which will be run on each request
 
-Basic authentication can be enabled by env var: NEED_AUTH, accounts and passwords are stored in users.csv
+Basic authentication can be enabled by env var: BASIC_AUTH, accounts and passwords are stored in the file specified in $BASIC_AUTH_FILE
 
-# Problems...
-Well there's a little problem... since accept doesn't close the connection (Or i'm doing something wrong), the connection will go into TIME_WAIT.
-This means that we need to wait the time the connection will be closed, after that we can reopen a connection. 
-I will have a look at the source code and probably provide some options, like a bind-address and a close when the FD is closed.
 
-### UPDATE:
-Accept has been patched by me. Now we can handle multiple request at the same time, without waiting the TIME_WAIT. 
+# Usage
+Simple explication of various functions that could be used.
 
-To use the new accept, you will need to compile the accept from this repo, a pull request will be send to bash, but it will take some time.
+## Session Handling
+Variables:
 
-Now we can run multiple connection on the same time, since the connection is running in a subshell.
+```
+    SESSION_COOKIE
+        The name of the cookie : default BASHSESSID
+```
 
-# Busion
-Busion is used to source some functions from other repositorys instead of copy/paste (https://github.com/dzove855/busion)
+Functions:
 
-# TODO
-- [X] Implement logging and provide a logging format like httpd
-- [X] Implement multi processing (this will be a huge step, but we need to patch accept)
-- [X] Implement urlencode/decode to provide readable get data
-- [X] Implement content-type detection - Use mime type like nginx
-- [X] Add basic auth
-- [X] Add cookie handler
-- [X] Add session handler
-- [ ] Implement Cookie send
+```
+    sessionStart
+        Start a session or reuse an existing session
+
+    sessionSet $1 $2
+        Set a session variable
+
+    sessionGet $1 
+        Get the value of the given variable
+```
+
+## Cookie Handling
+Functions:
+
+```
+    cookieSet $1 
+        Send the cookie
+        Example: cookieSet "BASHSESSID=12345; max-age=5000" 
+```
+
+## HTTP Handling
+Functions:
+
+```
+    httpSendStatus $1 
+        Send the provided http status
+        Example: httpSendStatus 200
+
+    To set Headers, you should add an entry inside the assoc var HTTP_RESPONSE_HEADERS
+        HTTP_RESPONSE_HEADERS["ExampleHeader"]="The value of the Header"
+```
