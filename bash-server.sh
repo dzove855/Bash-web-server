@@ -8,7 +8,7 @@ urldecode() {
 
 # https://gist.github.com/markusfisch/6110640
 uuidgen() {
-    [private] N B C='89ab'
+    local N B C='89ab'
 
     for (( N=0; N < 16; ++N )); do
         B="$(( RANDOM%256 ))"
