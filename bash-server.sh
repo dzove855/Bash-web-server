@@ -6,6 +6,30 @@ urldecode() {
     printf '%b\n' "${_//%/\\x}"
 }
 
+# https://gist.github.com/markusfisch/6110640
+uuidgen() {
+    [private] N B C='89ab'
+
+    for (( N=0; N < 16; ++N )); do
+        B="$(( RANDOM%256 ))"
+
+        case $N in
+        6)
+            printf '4%x' $(( B%16 ))
+        ;;
+        8)
+            printf '%c%x' ${C:$RANDOM%${#C}:1} $(( B%16 ))
+        ;;
+        3 | 5 | 7 | 9)
+            printf '%02x-' $B
+        ;;
+        *)
+            printf '%02x' $B
+        ;;
+        esac
+    done
+}
+
 parseHttpRequest(){
     # Get information about the request
     read -r REQUEST_METHOD REQUEST_PATH HTTP_VERSION
@@ -88,7 +112,14 @@ buildHttpHeaders(){
     printf '%s %s\n' "$HTTP_VERSION" "${HTTP_RESPONSE_HEADERS['status']}"
     unset HTTP_RESPONSE_HEADERS['status']
 
+    _verbose 2 "${cookie_to_send}"
+
+    for value in "${cookie_to_send[@]}"; do
+        printf 'Set-Cookie: %s\n' "$value"
+    done
+
     for key in "${!HTTP_RESPONSE_HEADERS[@]}"; do
+        _verbose 2 "$key ${HTTP_RESPONSE_HEADERS[$key]}"
         printf '%s: %s\n' "$key" "${HTTP_RESPONSE_HEADERS[$key]}"
     done 
 }
@@ -102,7 +133,7 @@ buildResponse(){
 
     [[ $1 == 401 ]] && \
     {
-        HTTP_RESPONSE_HEADERS['WWW-Authenticate']="Basic realm=FileServer"
+        HTTP_RESPONSE_HEADERS['WWW-Authenticate']="Basic realm=WebServer"
         buildHttpHeaders
         return
     }
@@ -138,6 +169,8 @@ parseAndPrint(){
     local -A GET
     local -A HTTP_RESPONSE_HEADERS
     local -A COOKIE
+    local -A SESSION
+    local -a cookie_to_send
 
     # Now mktemp will write create files inside the temporary directory
     local -r TMPDIR="$serverTmpDir"
@@ -149,8 +182,8 @@ parseAndPrint(){
     parseHttpHeaders
 
     # Basic Auth
-    if [[ -n "$NEED_AUTH" ]] && basicAuth -eq 0; then
-        return
+    if (( $BASIC_AUTH )) then
+        basicAuth || return 1
     fi
 
     # Parse Get Data
@@ -159,6 +192,12 @@ parseAndPrint(){
     # Parse cookie data
     parseCookieData
 
+
+    if [[ -z "${COOKIE["$SESSION_COOKIE"]}" ]]; then
+        SESSION_ID="$(uuidgen)"
+    else
+        SESSION_ID="${COOKIE["$SESSION_COOKIE"]}"
+    fi
     # Parse post data only if length is > 0 and post is specified
     # bash (( will not fail if var is not a number, it will just return 1, no need of int check
     if [[ "$REQUEST_METHOD" == "POST" ]] && (( ${HTTP_HEADERS['Content-Length']} > 0 )); then
@@ -170,8 +209,12 @@ parseAndPrint(){
 
 basicAuth(){
     local authData
-    local user password
-    let pass=0
+    local user password 
+
+    [[ -f "$BASIC_AUTH_FILE" ]] || {
+        _verbose 1 "Missing \$BASIC_AUTH_FILE"
+        return 1
+    }
 
     if [[ -z "${HTTP_HEADERS["Authorization"]}" ]]; then
         buildResponse 401
@@ -179,20 +222,53 @@ basicAuth(){
     fi
 
     # Decode auth data
+    # TODO: implement base64 in bash
     authData="$(base64 -d <<<"${HTTP_HEADERS["Authorization"]# Basic }")"
 
     # Split auth data into user and password
     IFS=: read -r user password <<<"$authData"
 
     # Check if user and password appear in users.csv
-    pass=$(awk -v user="$user" -v password="$password" 'BEGIN {existed=0} \
-        {if($1 == user && $2 == password) {existed = 1}} \
-        END {print existed}' < users.csv)
-
-    [[ $pass -eq 1 ]] && return 1
+    while read -r r_user r_password; do
+        [[ "$r_user" == "$user" && "$r_password" == "$password" ]] && {
+            return
+        }
+    done < "$BASIC_AUTH_FILE"
 
     buildResponse 401
-    return 0
+    return 1
+}
+
+sessionStart(){
+    [[ -d "${SESSION_PATH}" ]] || {
+        _verbose 1 "Missing Session Path \$SESSION_PATH"
+        return 1
+    }
+
+    if [[ -f "${SESSION_PATH}/$SESSION_ID" ]]; then
+        return 0
+    else
+        cookieSet "$SESSION_COOKIE=$SESSION_ID; max-age=5000"
+        return 1
+    fi
+}
+
+sessionGet(){
+    sessionStart && {
+        source "${SESSION_PATH}/$SESSION_ID"
+        printf '%s' "${SESSION[$1]}"
+    }
+}
+
+sessionSet(){
+    sessionStart && source "${SESSION_PATH}/$SESSION_ID"
+    SESSION["$1"]="$2"
+    declare -p SESSION > "${SESSION_PATH}/$SESSION_ID"
+}
+
+cookieSet(){
+    _verbose 2 "$1"
+    cookie_to_send+=("$1")
 }
 
 serveHtml(){
@@ -267,11 +343,14 @@ _verbose(){
     }
 }
 
+clean(){
+    kill -9 $_pid
+}
+
 main(){
 
     local -A MIME_TYPES
 
-    : "${BASH_LOADABLE_PATH:=/usr/lib/bash}"
     : "${HTTP_PORT:=8080}"
     : "${BIND_ADDRESS:=127.0.0.1}"
     : "${MIME_TYPES_FILE:=./mime.types}"
@@ -279,14 +358,16 @@ main(){
     : "${LOGFORMAT:="[%t] - %a %m %U %s %b %T"}"
     : "${LOGFILE:=access.log}"
     : "${LOGGING:=1}"
+    : "${SESSION_COOKIE:=BASHSESSID}"
+    : "${BASIC_AUTH:=0}"
     TMPDIR="${TMPDIR%/}"
 
     ! [[ ${BIND_ADDRESS} == "0.0.0.0" ]] && acceptArg="-b ${BIND_ADDRESS}"
 
-    if ! [[ -f "${BASH_LOADABLE_PATH%/}/accept" ]]; then
+    enable -f accept accept || {
         printf '%s\n' "Cannot load accept..."
         exit 1
-    fi
+    }
 
     [[ -f "$MIME_TYPES_FILE" ]] && \
         while read -r types extension; do
@@ -299,15 +380,12 @@ main(){
     
     # Enable mktemp and rm as a builtin :D
     # Don't fail if it doesn't exist
-    enable -f "${BASH_LOADABLE_PATH%/}/mktemp"  mktemp  &>/dev/null || true
-    enable -f "${BASH_LOADABLE_PATH%/}/rm"      rm      &>/dev/null || true
-    enable -f "${BASH_LOADABLE_PATH%/}/finfo"   finfo   &>/dev/null || true
-
-    enable -f "${BASH_LOADABLE_PATH%/}/accept" accept || {
-        printf '%s\n' "Could not load accept..."
-        exit 1
-    }
+    enable -f "mktemp"  mktemp  &>/dev/null || true
+    enable -f "rm"      rm      &>/dev/null || true
+    enable -f "finfo"   finfo   &>/dev/null || true
  
+    trap clean EXIT
+
     case "$1" in
         serveHtml)
             run="serveHtml"
@@ -358,6 +436,8 @@ main(){
             # remove the temporary directoru
             rm -rf "$serverTmpDir"
         ) & 
+
+        _pid="$!"
 
         until [[ -s "$serverTmpDir/spawnNewProcess" || ! -f "$serverTmpDir/spawnNewProcess" ]]; do : ; done
 
