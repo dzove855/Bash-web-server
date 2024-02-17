@@ -291,7 +291,6 @@ main(){
 
     local -A MIME_TYPES
 
-    : "${BASH_LOADABLE_PATH:=/usr/lib/bash}"
     : "${HTTP_PORT:=8080}"
     : "${BIND_ADDRESS:=127.0.0.1}"
     : "${MIME_TYPES_FILE:=./mime.types}"
@@ -305,10 +304,10 @@ main(){
 
     ! [[ ${BIND_ADDRESS} == "0.0.0.0" ]] && acceptArg="-b ${BIND_ADDRESS}"
 
-    if ! [[ -f "${BASH_LOADABLE_PATH%/}/accept" ]]; then
+    enable -f accept accept || {
         printf '%s\n' "Cannot load accept..."
         exit 1
-    fi
+    }
 
     [[ -f "$MIME_TYPES_FILE" ]] && \
         while read -r types extension; do
@@ -321,14 +320,9 @@ main(){
     
     # Enable mktemp and rm as a builtin :D
     # Don't fail if it doesn't exist
-    enable -f "${BASH_LOADABLE_PATH%/}/mktemp"  mktemp  &>/dev/null || true
-    enable -f "${BASH_LOADABLE_PATH%/}/rm"      rm      &>/dev/null || true
-    enable -f "${BASH_LOADABLE_PATH%/}/finfo"   finfo   &>/dev/null || true
-
-    enable -f "${BASH_LOADABLE_PATH%/}/accept" accept || {
-        printf '%s\n' "Could not load accept..."
-        exit 1
-    }
+    enable -f "mktemp"  mktemp  &>/dev/null || true
+    enable -f "rm"      rm      &>/dev/null || true
+    enable -f "finfo"   finfo   &>/dev/null || true
  
     case "$1" in
         serveHtml)
