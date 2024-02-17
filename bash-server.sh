@@ -6,6 +6,30 @@ urldecode() {
     printf '%b\n' "${_//%/\\x}"
 }
 
+# https://gist.github.com/markusfisch/6110640
+uuidgen() {
+    [private] N B C='89ab'
+
+    for (( N=0; N < 16; ++N )); do
+        B="$(( RANDOM%256 ))"
+
+        case $N in
+        6)
+            printf '4%x' $(( B%16 ))
+        ;;
+        8)
+            printf '%c%x' ${C:$RANDOM%${#C}:1} $(( B%16 ))
+        ;;
+        3 | 5 | 7 | 9)
+            printf '%02x-' $B
+        ;;
+        *)
+            printf '%02x' $B
+        ;;
+        esac
+    done
+}
+
 parseHttpRequest(){
     # Get information about the request
     read -r REQUEST_METHOD REQUEST_PATH HTTP_VERSION
@@ -168,6 +192,12 @@ parseAndPrint(){
     # Parse cookie data
     parseCookieData
 
+
+    if [[ -z "${COOKIE["$SESSION_COOKIE"]}" ]]; then
+        SESSION_ID="$(uuidgen)"
+    else
+        SESSION_ID="${COOKIE["$SESSION_COOKIE"]}"
+    fi
     # Parse post data only if length is > 0 and post is specified
     # bash (( will not fail if var is not a number, it will just return 1, no need of int check
     if [[ "$REQUEST_METHOD" == "POST" ]] && (( ${HTTP_HEADERS['Content-Length']} > 0 )); then
@@ -210,20 +240,30 @@ basicAuth(){
 }
 
 sessionStart(){
-    if [[ ! -z "${COOKIE[$SESSION_COOKIE]}" && -f "${SESSION_PATH}/${COOKIE[$SESSION_COOKIE]}" ]]; then
+    [[ -d "${SESSION_PATH}" ]] || {
+        _verbose 1 "Missing Session Path \$SESSION_PATH"
+        return 1
+    }
+
+    if [[ -f "${SESSION_PATH}/$SESSION_ID" ]]; then
         return 0
+    else
+        cookieSet "$SESSION_COOKIE=$SESSION_ID; max-age=5000"
+        return 1
     fi
 }
 
 sessionGet(){
-    sessionStart && source "${SESSION_PATH}/${COOKIE[$SESSION_COOKIE]}"
-    printf '%s' "${SESSION[$1]}"
+    sessionStart && {
+        source "${SESSION_PATH}/$SESSION_ID"
+        printf '%s' "${SESSION[$1]}"
+    }
 }
 
 sessionSet(){
-    sessionStart && source "${SESSION_PATH}/${COOKIE[$SESSION_COOKIE]}"
+    sessionStart && source "${SESSION_PATH}/$SESSION_ID"
     SESSION["$1"]="$2"
-    declare -p SESSION > "${SESSION_PATH}/${COOKIE[$SESSION_COOKIE]}"
+    declare -p SESSION > "${SESSION_PATH}/$SESSION_ID"
 }
 
 cookieSet(){
