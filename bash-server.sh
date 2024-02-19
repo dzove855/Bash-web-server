@@ -193,7 +193,7 @@ parseAndPrint(){
     parseCookieData
 
 
-    if [[ -z "${COOKIE["$SESSION_COOKIE"]}" ]]; then
+    if [[ -z "${COOKIE["$SESSION_COOKIE"]}" ]] || [[ "${COOKIE["$SESSION_COOKIE"]}" == *..* ]]; then
         SESSION_ID="$(uuidgen)"
     else
         SESSION_ID="${COOKIE["$SESSION_COOKIE"]}"
@@ -276,7 +276,7 @@ serveHtml(){
         DOCUMENT_ROOT="${DOCUMENT_ROOT%/}"
 
         # Don't allow going out of DOCUMENT_ROOT
-        case "$DOCUMENT_ROOT" in
+        case "$REQUEST_PATH" in
             *".."*|*"~"*)
                 httpSendStatus 404
                 printf '404 Page Not Found!\n'
