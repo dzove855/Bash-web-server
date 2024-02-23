@@ -30,25 +30,19 @@ uuidgen() {
     done
 }
 
-Dec2Hex() {
-    local num
-    num=$(echo 'obase=16; ibase=10; '"$1" | bc)
-    if ((${#num} == 1)); then
-        num=0"$num"
-    fi
-    printf "0x%s" "$num"
-}
-
 send_encoded_frame() {
-    local data="$1"
-#   # 1st nible: 0x8 -> the final frame
-#   # 2nd bible: 0x1 -> textual frame
     local first_byte="0x81"
-    local payload_length=${#data}
-    local second_byte 
-    second_byte=$(Dec2Hex "$payload_length") # no mask
-    printf "%s%s" $first_byte "$second_byte" | xxd -r -p
-    printf "%s" "$data"
+    local hex_string binary
+
+# TODO: Get this working!
+#    printf -v 'hex_string' '%s0x%x' "$first_byte" "${#1}"    
+#    for ((i = 0; i < ${#hex_string}; i += 2)); do
+#        binary+="\x${hex_string:i:2}"
+#    done
+#    _verbose 4 "$binary"
+
+    printf '%s0x%x' $first_byte "${#1}" | xxd -r -p    
+    printf '%b%s' "$binary" "$1"
 }
 
 parseHttpRequest(){
@@ -216,7 +210,7 @@ buildResponse(){
             "$websocketRunner" > "$TMPDIR/output"
             message="$(<"$TMPDIR/output")"
             send_encoded_frame "$message"
-
+#            encode_message "$message"
             sleep 5
             (( websocketStop )) && break
         done
