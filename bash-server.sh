@@ -42,7 +42,7 @@ send_encoded_frame() {
 #    _verbose 4 "$binary"
 
     printf '%s0x%x' $first_byte "${#1}" | xxd -r -p    
-    printf '%b%s' "$binary" "$1"
+    printf '%s' "$1"
 }
 
 parseHttpRequest(){
