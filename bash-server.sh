@@ -30,6 +30,27 @@ uuidgen() {
     done
 }
 
+Dec2Hex() {
+    local num
+    num=$(echo 'obase=16; ibase=10; '"$1" | bc)
+    if ((${#num} == 1)); then
+        num=0"$num"
+    fi
+    printf "0x%s" "$num"
+}
+
+send_encoded_frame() {
+    local data="$1"
+#   # 1st nible: 0x8 -> the final frame
+#   # 2nd bible: 0x1 -> textual frame
+    local first_byte="0x81"
+    local payload_length=${#data}
+    local second_byte 
+    second_byte=$(Dec2Hex "$payload_length") # no mask
+    printf "%s%s" $first_byte "$second_byte" | xxd -r -p
+    printf "%s" "$data"
+}
+
 parseHttpRequest(){
     # Get information about the request
     read -r REQUEST_METHOD REQUEST_PATH HTTP_VERSION
@@ -37,13 +58,14 @@ parseHttpRequest(){
 }
 
 parseHttpHeaders(){
-    local line
+    local line _h _v
     # Split headers and put it inside HTTP_HEADERS, so it can be reused
     while read -r line; do
         line="${line%%$'\r'}"
-
+        _verbose 3 "$line"
         [[ -z "$line" ]] && return
-        HTTP_HEADERS["${line%%:*}"]="${line#*:}" 
+        _h="${line%%:*}"
+        HTTP_HEADERS["${_h,,}"]="${line#*: }" 
     done
 }
 
@@ -92,6 +114,7 @@ parseCookieData(){
 
 httpSendStatus(){
     local -A status_code=(
+        [101]="101 Switching Protocols"
         [200]="200 OK"
         [201]="201 Created"
         [301]="301 Moved Permanently"
@@ -109,8 +132,9 @@ httpSendStatus(){
 
 buildHttpHeaders(){
     # We will first send the status header and then all the other headers
+    _verbose 2 "status ${HTTP_RESPONSE_HEADERS['status']}"
     printf '%s %s\n' "$HTTP_VERSION" "${HTTP_RESPONSE_HEADERS['status']}"
-    unset HTTP_RESPONSE_HEADERS['status']
+    unset 'HTTP_RESPONSE_HEADERS["status"]'
 
     _verbose 2 "${cookie_to_send}"
 
@@ -119,17 +143,30 @@ buildHttpHeaders(){
     done
 
     for key in "${!HTTP_RESPONSE_HEADERS[@]}"; do
-        _verbose 2 "$key ${HTTP_RESPONSE_HEADERS[$key]}"
-        printf '%s: %s\n' "$key" "${HTTP_RESPONSE_HEADERS[$key]}"
+        _verbose 2 "${key,,}: ${HTTP_RESPONSE_HEADERS[$key]}"
+        printf '%s: %s\n' "${key,,}" "${HTTP_RESPONSE_HEADERS[$key]}"
     done 
+}
+
+websocketStart(){
+    websocketStart=1
+    websocketRunner="$1"
+}
+
+websocketStop(){
+    websocketStop=1
 }
 
 buildResponse(){
     # Every output will first be saved in a file and then printed to the output
     # Like this we can build a clean output to the client
 
+    local websocketStart websocketRunner websocketStop sha1
+    websocketStart=0
+    websocketStop=0
+
     # build a default header
-    httpSendStatus $1
+    httpSendStatus "$1"
 
     [[ $1 == 401 ]] && \
     {
@@ -140,12 +177,22 @@ buildResponse(){
 
     # get mime type
     IFS=. read -r _ extension <<<"$REQUEST_PATH"
-    [[ -z "${MIME_TYPES["${extension:-html}"]}" ]] || HTTP_RESPONSE_HEADERS["Content-Type"]="${MIME_TYPES["${extension:-html}"]}"
+    [[ -z "${MIME_TYPES["${extension:-html}"]}" ]] || HTTP_RESPONSE_HEADERS["content-type"]="${MIME_TYPES["${extension:-html}"]}"
 
     "$run" >"$TMPDIR/output"
 
     # get content-legth 
-    PATH="" type -p "finfo" &>/dev/null && HTTP_RESPONSE_HEADERS["Content-Length"]="$(finfo -s $TMPDIR/output)"
+    PATH="" type -p "finfo" &>/dev/null && HTTP_RESPONSE_HEADERS["content-length"]="$(finfo -s "$TMPDIR/output")"
+
+    if (( websocketStart )); then
+        httpSendStatus 101
+        HTTP_RESPONSE_HEADERS['upgrade']="${HTTP_HEADERS['upgrade']}"
+        HTTP_RESPONSE_HEADERS['connection']="upgrade"
+        read -r sha1 _ <<<"$(printf '%s' "${HTTP_HEADERS['sec-websocket-key']}258EAFA5-E914-47DA-95CA-C5AB0DC85B11" | openssl dgst -binary -sha1 | base64)"
+        HTTP_RESPONSE_HEADERS['sec-websocket-accept']="$sha1"
+        unset "HTTP_RESPONSE_HEADERS['content-length']"
+        unset "HTTP_RESPONSE_HEADERS['content-type']"
+    fi
 
     # print output to logfile
     (( LOGGING )) && logPrint
@@ -154,11 +201,27 @@ buildResponse(){
     # From HTTP RFC 2616 send newline before body
     printf "\n"
 
-    printf '%s\n' "$(<$TMPDIR/output)"
+    (( websocketStart )) || printf '%s\n' "$(<"$TMPDIR/output")"
     
     # remove tmpfile, this should be trapped...
     # XXX: No needed anymore, since the clean will do the job for use
     # rm "$tmpFile"
+
+    if (( websocketStart )); then
+        _verbose 4 "Websocket Upgrade - $websocketRunner"
+        local websocketStop
+        websocketStop=0
+        sleep 3
+        while true; do
+            "$websocketRunner" > "$TMPDIR/output"
+            message="$(<"$TMPDIR/output")"
+            send_encoded_frame "$message"
+
+            sleep 5
+            (( websocketStop )) && break
+        done
+    fi
+
 }
 
 parseAndPrint(){
@@ -182,7 +245,7 @@ parseAndPrint(){
     parseHttpHeaders
 
     # Basic Auth
-    if (( $BASIC_AUTH )) then
+    if (( BASIC_AUTH )) then
         basicAuth || return 1
     fi
 
@@ -272,7 +335,7 @@ cookieSet(){
 }
 
 serveHtml(){
-    if [[ ! -z "$DOCUMENT_ROOT" ]]; then
+    if [[ -n "$DOCUMENT_ROOT" ]]; then
         DOCUMENT_ROOT="${DOCUMENT_ROOT%/}"
 
         # Don't allow going out of DOCUMENT_ROOT
@@ -285,7 +348,7 @@ serveHtml(){
         esac
         [[ "$REQUEST_PATH" == "/" ]] && REQUEST_PATH="/index.html"
         if [[ -f "$DOCUMENT_ROOT/${REQUEST_PATH#/}" ]]; then
-            printf '%s\n' "$(<$DOCUMENT_ROOT/${REQUEST_PATH#/})"
+            printf '%s\n' "$(<"$DOCUMENT_ROOT/${REQUEST_PATH#/}")"
         else
             httpSendStatus 404
             printf '404 Page Not Found!\n'
@@ -307,7 +370,7 @@ logPrint(){
     logformat["%q"]="$QUERY_STRING"
     logformat["%t"]="$TIME_FORMATTED"
     logformat["%s"]="${HTTP_RESPONSE_HEADERS['status']%% *}"
-    logformat["%T"]="$(( $(printf '%(%s)T' -1 ) - $TIME_SECONDS))"
+    logformat["%T"]="$(( $(printf '%(%s)T' -1 ) - TIME_SECONDS))"
     logformat["%U"]="$REQUEST_PATH"
     
 
@@ -344,7 +407,7 @@ _verbose(){
 }
 
 clean(){
-    kill -9 $_pid
+    kill -9 "$_pid"
 }
 
 main(){
@@ -371,7 +434,7 @@ main(){
 
     [[ -f "$MIME_TYPES_FILE" ]] && \
         while read -r types extension; do
-            read -a extensions <<<"$extension"
+            read -ra extensions <<<"$extension"
             for ext in "${extensions[@]}"; do
                 MIME_TYPES["$ext"]="$types"
             done
