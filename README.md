@@ -63,7 +63,7 @@ Functions:
 ```
 
 ## Websocket
-NOTE: This is still expiremental and only works for sendin data, not receiving! 
+!!!NOTE: This is still expiremental and only works for sendin data, not receiving! 
 
 Functions:
 ```
