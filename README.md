@@ -61,3 +61,14 @@ Functions:
     To set Headers, you should add an entry inside the assoc var HTTP_RESPONSE_HEADERS
         HTTP_RESPONSE_HEADERS["ExampleHeader"]="The value of the Header"
 ```
+
+## Websocket
+NOTE: This is still expiremental and only works for sendin data, not receiving! 
+
+```
+    websocketStart FUNCTION
+        Start the websocket server
+
+    websocketStop
+        Stop the websocket server inside the function
+```
